@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+
+### ---------------------------- Global env. variables ---------------------------
+
+APP_NAME='ochi'
+APP_VERSION=0.0.2
+# Allow to override ${APP_NAME} version during install.
+# Install: curl -s https://raw.githubusercontent.com/jefferyb/useful-scripts/${BRANCH:-master}/${APP_NAME} | BRANCH=develop bash -s install
+# Update: BRANCH=develop ${APP_NAME} update
+APP_URL="https://raw.githubusercontent.com/jefferyb/useful-scripts/${BRANCH:-master}/${APP_NAME}"
+
+INSTALL_PATH="${HOME}/.local/bin"
+
+### ------------------------------------------------------------------------------
+
+if [[ "$TERM" != "dumb" ]]; then
+  # Console colors
+  green='\033[0;32;49m'
+  green_bg='\033[0;42;30m'
+  yellow='\033[0;33;49m'
+  red='\033[0;91;49m'
+  lightmagenta='\033[0;95;49m'
+  lightmagenta_bg='\033[0;105;30m'
+  NC='\033[0m'
+fi
+
+echo-red ()      { echo -e "${red}$1${NC}"; }
+echo-green ()    { echo -e "${green}$1${NC}"; }
+echo-green-bg () { echo -e "${green_bg}$1${NC}"; }
+echo-yellow ()   { echo -e "${yellow}$1${NC}"; }
+echo-notice () {
+  echo -e "${lightmagenta_bg} NOTICE: ${NC} ${lightmagenta}$1${NC}"
+  shift
+  for arg in "$@"; do
+    echo -e "         $arg"
+  done
+}
+### -------------------------------- OS Checks ------------------------------------
+# OS version detection
+if  [[ -f "/etc/os-release" ]]; then
+  (uname -a | grep -v 'Microsoft' >/dev/null) && OS_TYPE="Linux" || OS_TYPE="WSL"
+  IFS=";" read OS_NAME OS_VERSION OS_ID OS_ID_LIKE < <(source "/etc/os-release"; echo "$NAME;$VERSION_ID;$ID;$ID_LIKE")
+  export OS_TYPE OS_NAME OS_VERSION
+elif (uname | grep 'Darwin' >/dev/null); then
+  export OS_TYPE="Darwin"
+  export OS_NAME="$(sw_vers -productName)"
+  export OS_VERSION="$(sw_vers -productVersion)"
+fi
+
+if [[ "$(uname -a)" =~ "x86_64" ]]; then
+  OS_ARCH="amd64"
+elif [[ "$(uname -a)" =~ "arm" ]]; then
+  OS_ARCH="arm64"
+fi
+
+
+is_mac () {
+  [[ "$OS_TYPE" == "Darwin" ]]
+}
+
+is_linux () {
+  [[ "$OS_TYPE" == "Linux" ]]
+}
+
+is_debian () {
+  [[ "$OS_ID" == "ubuntu" ]] || [[ "$OS_ID" == "debian" ]] ||
+  [[ "$OS_ID_LIKE" =~ "ubuntu" ]] || [[ "$OS_ID_LIKE" =~ "debian" ]]
+}
+
+is_fedora () {
+  [[ "$OS_ID" == "fedora" ]] || [[ "$OS_ID" == "centos" ]]
+}
+
+### ------------------------------------------------------------------------------
+
+### ---------------------------- Useful Functions --------------------------------
+
+add_install_path() {
+  echo-notice "Please add [[[ export PATH=\${HOME}/.local/bin:\$PATH ]]] to your PATH in one of the ~/.bashrc or ~/.profile or ~/.zsh files"
+}
+
+### ------------------------------------------------------------------------------
+
+### ---------------------------- Install Functions --------------------------------
+
+install::app() {
+  echo-green "$(date) -- Installing ${APP_NAME}..."
+  set -xe
+  mkdir -p "${INSTALL_PATH}"
+  wget -q "${APP_URL}" --output-document=/tmp/${APP_NAME}
+  chmod +x /tmp/${APP_NAME}
+  mv -f /tmp/${APP_NAME} "${INSTALL_PATH}/${APP_NAME}"
+  set +xe
+  command -v ${APP_NAME} >/dev/null || add_install_path
+}
+
+install::fluxcd() {
+  echo-green "$(date) -- Installing FluxCD..."
+  set -xe
+  curl -s https://fluxcd.io/install.sh | sudo bash
+  set +xe
+  echo-green "$(date) -- FluxCD has been installed..."
+  command -v fluxcd >/dev/null || add_install_path
+  echo-notice "If you haven't, you can add [[[ command -v flux >/dev/null && . <(flux completion bash) ]]] to you ~/.bashrc or ~/.profile to load flux completion... Or run [[[ flux completion -h ]]] for other options..."
+  echo
+}
+
+install::kapp() {
+  set -e
+  echo-green "$(date) -- Installing kapp..."
+  set -xe
+  curl -L https://carvel.dev/install.sh | K14SIO_INSTALL_BIN_DIR=${INSTALL_PATH} bash
+  set +xe
+  command -v kapp >/dev/null || add_install_path
+  echo-green "$(date) -- kapp has been installed..."
+}
+
+### ------------------------------------------------------------------------------
+
+
+app-version () {
+  if [[ $2 == '--short' ]]; then
+    echo "$APP_VERSION"
+  else
+    UPSTREAM_APP_VERSION="$(curl --silent "${APP_URL}" | awk -F '=' '/APP_VERSION/ {print $2;exit;}' )"
+    echo -n """$(tput setaf 5)${APP_NAME} version:$(tput sgr0) ${APP_VERSION} """
+    if [ "${APP_VERSION}" == "${UPSTREAM_APP_VERSION}" ]; then 
+      echo "( $(tput setaf 2)up-to-date$(tput sgr0) )"
+    else
+      echo "( $(tput setaf 1)${UPSTREAM_APP_VERSION} is the latest...$(tput sgr0) Run '$(tput setaf 2)${APP_NAME} update$(tput sgr0)' to bring it up-to-date )"
+    fi
+	fi
+}
+
+
+app-usage() {
+  echo "
+Usage: 
+  $(basename "${0}") [command] [arguments]
+
+Available Commands:
+  install::fluxcd                     Install FluxCD CLI > https://fluxcd.io/docs/cmd/#install-using-bash
+  install::kapp                       Install kapp CLI > https://carvel.dev/kapp/docs/develop/install/#via-script-macos-or-linux
+
+  version, -v, --version              version for ${APP_NAME}
+    --short
+
+  "
+}
+
+case "$1" in
+  -v|--version|version )
+    app-version "$@"
+    ;;
+
+  -h|--help )
+    app-usage
+    ;;
+
+  ### Installs
+  install::app|update|install )
+    install::app "$@"
+    ;;
+
+  install::fluxcd )
+    install::fluxcd
+    ;;
+
+  install::kapp )
+    install::kapp
+    ;;
+
+  * )
+    app-usage
+    ;;
+
+esac
+
+exit $?
+
