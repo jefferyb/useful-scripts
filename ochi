@@ -84,6 +84,7 @@ add_install_path() {
 ### ---------------------------- Install Functions --------------------------------
 
 install::app() {
+  echo
   echo-green "$(date) -- Installing ${APP_NAME}..."
   set -xe
   mkdir -p "${INSTALL_PATH}"
@@ -92,9 +93,11 @@ install::app() {
   mv -f /tmp/${APP_NAME} "${INSTALL_PATH}/${APP_NAME}"
   set +xe
   command -v ${APP_NAME} >/dev/null || add_install_path
+  echo
 }
 
 install::fluxcd() {
+  echo
   echo-green "$(date) -- Installing FluxCD..."
   set -xe
   curl -s https://fluxcd.io/install.sh | sudo bash
@@ -106,6 +109,7 @@ install::fluxcd() {
 }
 
 install::kapp() {
+  echo
   set -e
   echo-green "$(date) -- Installing kapp..."
   set -xe
@@ -113,6 +117,19 @@ install::kapp() {
   set +xe
   command -v kapp >/dev/null || add_install_path
   echo-green "$(date) -- kapp has been installed..."
+  echo
+}
+
+install::helm() {
+  echo
+  set -e
+  echo-green "$(date) -- Installing helm..."
+  set -xe
+  curl -s https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  set +xe
+  # command -v helm >/dev/null || add_install_path
+  echo-green "$(date) -- helm has been installed..."
+  echo
 }
 
 ### ------------------------------------------------------------------------------
@@ -141,6 +158,7 @@ Usage:
 Available Commands:
   install::fluxcd                     Install FluxCD CLI > https://fluxcd.io/docs/cmd/#install-using-bash
   install::kapp                       Install kapp CLI > https://carvel.dev/kapp/docs/develop/install/#via-script-macos-or-linux
+  install::helm                       Install helm CLI > https://helm.sh/docs/intro/install/#from-script
 
   version, -v, --version              version for ${APP_NAME}
     --short
@@ -168,6 +186,10 @@ case "$1" in
 
   install::kapp )
     install::kapp
+    ;;
+
+  install::helm )
+    install::helm
     ;;
 
   * )
